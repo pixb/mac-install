@@ -21,6 +21,9 @@ function brew_ui_install() {
   fi
 }
 
+# 关闭长按
+defaults write -g ApplePressAndHoldEnabled -bool false
+
 brew update
 brew upgrade
 brew_install gnu-sed
@@ -33,6 +36,54 @@ brew_ui_install visual-studio-code
 brew_install ripgrep
 brew_install the_silver_searcher
 brew_install pyenv
-pyenv install 3.13.0
-pyenv global 3.13.0
+if pyenv versions | grep "3.12.0" &>/dev/null; then
+  echo -e "${COLOR_GREEN}pyenv 3.12.0 is installed${COLOR_NC}"
+else
+  echo -e "${COLOR_YELLOW}pyenv 3.12.0 is not install...${COLOR_NC}"
+  pyenv install 3.12.0
+  pyenv global 3.12.0
+fi
 brew_install rcm
+brew_install fzf
+brew_install coreutils
+
+if command -v go &>/dev/null; then
+  echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
+else
+  echo -e "${COLOR_YELLOW}go is not install..${COLOR_NC}"
+  brew install go
+fi
+
+if [ -e "$HOME"/.sdkman/bin/sdkman-init.sh ]; then
+  echo -e "${COLOR_GREEN}sdkman is installed${COLOR_NC}"
+  source "$HOME"/.sdkman/bin/sdkman-init.sh
+else
+  echo -e "${COLOR_YELLOW}sdkman not init, init...${COLOR_NC}"
+  curl -s "https://get.sdkman.io" | bash
+fi
+
+if command -v java &>/dev/null; then
+  echo -e "${COLOR_GREEN}java is installed${COLOR_NC}"
+else
+  echo -e "${COLOR_YELLOW}java is not install${COLOR_NC}"
+  if command -v sdk &>/dev/null; then
+    echo -e "${COLOR_GREEN}sdkman is installed${COLOR_GREEN}"
+    sdk install java 11.0.23-tem
+  else
+    echo -e "${COLOR_YELLOW}sdknam is not install${COLOR_NC}"
+  fi
+fi
+
+if [ -d "${HOME}/dev/vimrc" ]; then
+  echo -e "${COLOR_GREEN}echo vimrc is exists${COLOR_NC}"
+else
+  echo -e "${COLOR_YELLOW}echo vimrc is not exists${COLOR_NC}"
+  git clone https://github.com/pixb/vimrc.git "${HOME}/dev/vimrc"
+fi
+
+if [ -e "${HOME}/.vimrc" ]; then
+  echo -e "${COLOR_GREEN}${HOME}/.vimrc is exists${COLOR_NC}"
+else
+  echo -e "${COLOR_GREEN}${HOME}/.vimrc is not exists${COLOR_NC}"
+  ln -sf "${HOME}/dev/vimrc/vimrc" "${HOME}"/.vimrc
+fi
