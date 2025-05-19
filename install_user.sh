@@ -46,6 +46,8 @@ fi
 brew_install rcm
 brew_install fzf
 brew_install coreutils
+brew_ui_install dbeaver-community
+brew install lazygit
 
 if command -v go &>/dev/null; then
   echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
