@@ -47,7 +47,8 @@ brew_install rcm
 brew_install fzf
 brew_install coreutils
 brew_ui_install dbeaver-community
-brew install lazygit
+brew_install lazygit
+brew_install wget
 
 if command -v go &>/dev/null; then
   echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
@@ -88,4 +89,12 @@ if [ -e "${HOME}/.vimrc" ]; then
 else
   echo -e "${COLOR_GREEN}${HOME}/.vimrc is not exists${COLOR_NC}"
   ln -sf "${HOME}/dev/vimrc/vimrc" "${HOME}"/.vimrc
+fi
+
+brew_install rustup
+rustup-init
+brew_install tmux
+
+if [ ! -d "$HOME"/.tmux ]; then
+  bash "$HOME"/dev/install-arch/tmux/config_tmux.sh
 fi
