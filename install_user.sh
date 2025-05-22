@@ -98,3 +98,5 @@ brew_install tmux
 if [ ! -d "$HOME"/.tmux ]; then
   bash "$HOME"/dev/install-arch/tmux/config_tmux.sh
 fi
+brew_install ranger
+ln -sf "${HOME}/dev/mac-install/config/ranger" "${HOME}/.config/ranger"
