@@ -1,2 +1,36 @@
 #!/usr/bin/env bash
+
+# 清理Homebrew缓存
 brew cleanup -v --prune=all
+
+# 清理npm/pnpm缓存
+pnpm store prune
+npm cache clean --force
+
+# 清理pip缓存
+pip cache purge
+
+# 清理Docker镜像
+docker image prune -a
+
+# 清理pip
+pip3 autoremove -y
+
+# 清理Ruby gems
+gem cleanup
+
+# 清理Yarn缓存
+yarn cache clean --force
+
+# 清理pipenv lock文件
+find ~/Library/Caches -name "*.lock" -delete
+
+# 清理系统日志
+sudo rm -rf /var/log/*
+
+# 清理DNS缓存
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+
+# 清理Spotlight索引
+sudo mdutil -E /
