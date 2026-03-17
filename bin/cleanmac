@@ -3,6 +3,9 @@
 # 清理Homebrew缓存
 brew cleanup -v --prune=all
 
+# 清理Xcode缓存
+xcodebuild clean
+
 # 清理npm/pnpm缓存
 pnpm store prune
 npm cache clean --force
