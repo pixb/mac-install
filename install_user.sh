@@ -31,6 +31,7 @@ brew_install ffmpeg
 brew_install htop
 brew_install btop
 brew_install duf
+brew_install bat
 brew_install fastfetch
 brew_ui_install visual-studio-code
 brew_install ripgrep
