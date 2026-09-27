@@ -11,6 +11,7 @@ COLOR_NC='\033[0m'
 
 log_info() { echo -e "${COLOR_YELLOW}[INFO]${COLOR_NC} $1"; }
 log_ok() { echo -e "${COLOR_GREEN}[OK]${COLOR_NC} $1"; }
+log_warn() { echo -e "${COLOR_YELLOW}[WARN]${COLOR_NC} $1"; }
 log_err() { echo -e "${COLOR_RED}[ERROR]${COLOR_NC} $1"; }
 
 set -uo pipefail
@@ -18,6 +19,15 @@ set -uo pipefail
 if ! command -v gpg &>/dev/null; then
   log_err "gpg 未安装"
   exit 1
+fi
+
+# keyboxd 启动时会遍历 0..RLIMIT_NOFILE 逐个 fstat（约 0.3µs/个）；
+# 上限几百万时启动即卡死或极慢（限值 2147483646 时永久挂起）。
+# 这里只在本脚本内把 soft limit 压回正常值，子进程随之继承。
+FD_LIMIT="$(ulimit -n 2>/dev/null || echo 0)"
+if [ "${FD_LIMIT:-0}" -gt 4194304 ] 2>/dev/null; then
+  log_warn "fd 上限过高（ulimit -n ${FD_LIMIT}），keyboxd 会卡死；本脚本内临时压到 524288"
+  ulimit -n 524288 2>/dev/null || true
 fi
 
 log_info "清理 gpg-agent / dirmngr / gpgconf（保留 keyboxd，避免重启卡死） ..."
@@ -31,9 +41,23 @@ GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
 # 强杀进程会留下 stale 锁文件（.#lk* / agent sentinel lock），
 # 不清理会导致后续 gpg 命令 100% CPU 忙循环卡死。
 log_info "清理 stale 锁文件 ..."
-rm -f "${GNUPGHOME}"/.#lk* "${GNUPGHOME}"/gnupg_spawn_agent_sentinel.lock || true
+rm -f "${GNUPGHOME}"/.#lk* "${GNUPGHOME}"/gnupg_spawn_*_sentinel.lock || true
 
 log_info "通过 gpg 命令自动拉起所需组件 ..."
-gpg --list-keys >/dev/null 2>&1 || true
+# keyboxd spawn 偶发竞争会导致 gpg 忙循环，用 timeout 加保护，卡死则清理重试
+TIMEOUT_CMD=""
+if command -v gtimeout &>/dev/null; then TIMEOUT_CMD="gtimeout 10"; elif command -v timeout &>/dev/null; then TIMEOUT_CMD="timeout 10"; fi
+
+if [ -n "$TIMEOUT_CMD" ]; then
+  if ! $TIMEOUT_CMD gpg --list-keys >/dev/null 2>&1; then
+    log_warn "拉起超时（keyboxd spawn 竞争），清理进程与锁后重试 ..."
+    killall gpg gpg-agent keyboxd dirmngr gpgconf 2>/dev/null || true
+    rm -f "${GNUPGHOME}"/.#lk* "${GNUPGHOME}"/gnupg_spawn_*_sentinel.lock || true
+    sleep 1
+    $TIMEOUT_CMD gpg --list-keys >/dev/null 2>&1 || true
+  fi
+else
+  gpg --list-keys >/dev/null 2>&1 || true
+fi
 
 log_ok "GPG 已就绪"

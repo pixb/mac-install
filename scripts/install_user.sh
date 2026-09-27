@@ -77,7 +77,7 @@ brew_install gnupg
 # 注意：stow 需在 mac-install 根目录执行，包内结构为 gnupg/.gnupg/*.conf
 # 先建好 700 的目录，避免 stow 折叠整目录链接导致 gpg 权限报错
 mkdir -p "${HOME}/.gnupg" && chmod 700 "${HOME}/.gnupg"
-( cd "${SCRIPT_DIR}/.." && stow -t "${HOME}" gnupg )
+(cd "${SCRIPT_DIR}/.." && stow -t "${HOME}" gnupg)
 
 if command -v go &>/dev/null; then
   echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
@@ -88,7 +88,9 @@ fi
 
 if [ -e "$HOME"/.sdkman/bin/sdkman-init.sh ]; then
   echo -e "${COLOR_GREEN}sdkman is installed${COLOR_NC}"
+  set +u
   source "$HOME"/.sdkman/bin/sdkman-init.sh
+  set -u
 else
   echo -e "${COLOR_YELLOW}sdkman not init, init...${COLOR_NC}"
   curl -s "https://get.sdkman.io" | bash
@@ -121,7 +123,15 @@ else
 fi
 
 brew_install rustup
-rustup-init -y
+# Homebrew 版 rustup 无 rustup-init / init 子命令，用 toolchain install 替代
+if rustup toolchain list 2>/dev/null | grep -q stable; then
+  echo -e "${COLOR_GREEN}rustup toolchain is installed${COLOR_NC}"
+else
+  rustup toolchain install stable
+  rustup default stable
+fi
 brew_install tmux
 brew_install ranger
 ln -sf "${HOME}/dev/mac-install/config/ranger" "${HOME}/.config/ranger"
+
+stow -t ~ local
