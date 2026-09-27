@@ -1,8 +1,24 @@
 #!/usr/bin/env bash
+
+COLOR_BLUE='\033[0;34m'
 COLOR_GREEN='\033[0;32m'
 COLOR_RED='\033[0;31m'
 COLOR_YELLOW='\033[0;33m'
 COLOR_NC='\033[0m'
+
+# Exit when an error occurs
+# Throw error when using an undefined variable
+set -euo pipefail
+
+TIME="$(date +%Y-%m-%d_%H-%M-%S)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+FILE_NAME="${SCRIPT_NAME%.*}"
+
+log_info() { echo -e "${COLOR_BLUE}[INFO]${COLOR_NC} $1"; }
+log_ok() { echo -e "${COLOR_GREEN}[OK]${COLOR_NC} $1"; }
+log_warn() { echo -e "${COLOR_YELLOW}[WARN]${COLOR_NC} $1"; }
+log_err() { echo -e "${COLOR_RED}[ERROR]${COLOR_NC} $1"; }
 
 function brew_install() {
   if brew list | grep "$1" &>/dev/null; then
@@ -12,6 +28,7 @@ function brew_install() {
     brew install "$1"
   fi
 }
+
 function brew_ui_install() {
   if brew list | grep "$1" &>/dev/null; then
     echo -e "${COLOR_GREEN}$1 is installed${COLOR_NC}"
@@ -37,6 +54,7 @@ brew_ui_install visual-studio-code
 brew_install ripgrep
 brew_install the_silver_searcher
 brew_install pyenv
+brew_install git-lfs
 if pyenv versions | grep "3.12.0" &>/dev/null; then
   echo -e "${COLOR_GREEN}pyenv 3.12.0 is installed${COLOR_NC}"
 else
@@ -50,6 +68,9 @@ brew_install coreutils
 brew_ui_install dbeaver-community
 brew_install lazygit
 brew_install wget
+brew_install herdr
+brew_install stow
+brew_install gnupg
 
 if command -v go &>/dev/null; then
   echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
@@ -93,7 +114,7 @@ else
 fi
 
 brew_install rustup
-rustup-init
+rustup-init -y
 brew_install tmux
 
 if [ ! -d "$HOME"/.tmux ]; then
