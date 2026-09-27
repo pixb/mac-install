@@ -55,6 +55,7 @@ brew_install ripgrep
 brew_install the_silver_searcher
 brew_install pyenv
 brew_install git-lfs
+brew_install git-crypt
 if pyenv versions | grep "3.12.0" &>/dev/null; then
   echo -e "${COLOR_GREEN}pyenv 3.12.0 is installed${COLOR_NC}"
 else
@@ -71,6 +72,12 @@ brew_install wget
 brew_install herdr
 brew_install stow
 brew_install gnupg
+
+# 用 stow 还原 ~/.gnupg 配置（包位于 mac-install/gnupg，目标为 ~）
+# 注意：stow 需在 mac-install 根目录执行，包内结构为 gnupg/.gnupg/*.conf
+# 先建好 700 的目录，避免 stow 折叠整目录链接导致 gpg 权限报错
+mkdir -p "${HOME}/.gnupg" && chmod 700 "${HOME}/.gnupg"
+( cd "${SCRIPT_DIR}/.." && stow -t "${HOME}" gnupg )
 
 if command -v go &>/dev/null; then
   echo -e "${COLOR_GREEN}go is installed${COLOR_NC}"
@@ -116,9 +123,5 @@ fi
 brew_install rustup
 rustup-init -y
 brew_install tmux
-
-if [ ! -d "$HOME"/.tmux ]; then
-  bash "$HOME"/dev/install-arch/tmux/config_tmux.sh
-fi
 brew_install ranger
 ln -sf "${HOME}/dev/mac-install/config/ranger" "${HOME}/.config/ranger"
