@@ -134,4 +134,9 @@ brew_install tmux
 brew_install ranger
 ln -sf "${HOME}/dev/mac-install/config/ranger" "${HOME}/.config/ranger"
 
+cd "${SCRIPT_DIR}/.." || exit 0
+
 stow -t ~ local
+stow -t ~ zsh
+
+cd "$SCRIPT_DIR"
