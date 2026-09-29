@@ -138,5 +138,6 @@ cd "${SCRIPT_DIR}/.." || exit 0
 
 stow -t ~ local
 stow -t ~ zsh
+stow -t ~ git
 
 cd "$SCRIPT_DIR"
