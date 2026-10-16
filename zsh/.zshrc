@@ -98,6 +98,13 @@ export PATH=$PATH:$GOPATH/bin
 ###########
 . "$HOME/.cargo/env"
 
+#########
+#  npm  #
+#########
+if [ -e "${HOME}/.npm-global" ]; then
+  export PATH="$HOME/.npm-global/bin:$PATH"
+fi
+
 # Load a few important annexes, without Turbo
 # (this is currently required for annexes)
 zinit light-mode for \

@@ -73,6 +73,16 @@ brew_install herdr
 brew_install stow
 brew_install gnupg
 
+### Install nodejs
+brew_install nodejs
+brew_install npm
+
+if [ ! -e "${HOME}/.npm-global" ]; then
+  mkdir -p "${HOME}/.npm-global"
+fi
+
+npm config set prefix ~/.npm-global
+
 # 用 stow 还原 ~/.gnupg 配置（包位于 mac-install/gnupg，目标为 ~）
 # 注意：stow 需在 mac-install 根目录执行，包内结构为 gnupg/.gnupg/*.conf
 # 先建好 700 的目录，避免 stow 折叠整目录链接导致 gpg 权限报错
@@ -141,3 +151,5 @@ stow -t ~ zsh
 stow -t ~ git
 
 cd "$SCRIPT_DIR"
+
+npm install -g --allow-scripts=opencode-ai opencode-ai || true
