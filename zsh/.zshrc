@@ -84,6 +84,11 @@ export PATH="$HOME/.local/bin:$PATH"
 ###########
 eval "$(pyenv init -)"
 
+###############
+#  uv  #
+###############
+export UV_CACHE_DIR="/Volumes/data/.cache/uv"
+
 ###########
 #  golang #
 ###########
@@ -104,6 +109,12 @@ export PATH=$PATH:$GOPATH/bin
 if [ -e "${HOME}/.npm-global" ]; then
   export PATH="$HOME/.npm-global/bin:$PATH"
 fi
+
+##################
+#  Hugging Face  #
+##################
+export HF_HOME="/Volumes/data/.cache/huggingface"
+
 
 # Load a few important annexes, without Turbo
 # (this is currently required for annexes)
@@ -130,3 +141,5 @@ if [ -d ${HOME}/dev/env ]; then
   . <(gpg -d ${HOME}/dev/env/env/agentmemory.env.gpg 2>/dev/null)
   . <(gpg -d ${HOME}/dev/env/env/amux.env.gpg 2>/dev/null)
 fi
+
+export ANET_HUB_TOKEN="atok_820179a164ca41ccbc3ba21f770e9600"

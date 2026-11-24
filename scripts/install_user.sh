@@ -50,12 +50,30 @@ brew_install btop
 brew_install duf
 brew_install bat
 brew_install fastfetch
-brew_ui_install visual-studio-code
+# 已卸载(2026-11)，需要时取消注释重装
+# brew_ui_install visual-studio-code
 brew_install ripgrep
 brew_install the_silver_searcher
 brew_install pyenv
 brew_install git-lfs
 brew_install git-crypt
+brew_install lf
+# lf previewer / helper dependencies (macOS ports live in ./lf and ./local)
+brew_install chafa
+brew_install catimg
+brew_install imagemagick
+brew_install poppler
+brew_install ffmpegthumbnailer
+brew_install xxhash
+brew_install mediainfo
+brew_install mpv
+brew_install mutt
+brew_install w3m
+brew_install p7zip
+brew_install unar
+brew_install python@3.12
+# mid3v2 (used by id3 helpers and scope) comes from python mutagen
+pip3 install --user --quiet mutagen 2>/dev/null || true
 if pyenv versions | grep "3.12.0" &>/dev/null; then
   echo -e "${COLOR_GREEN}pyenv 3.12.0 is installed${COLOR_NC}"
 else
@@ -66,10 +84,10 @@ fi
 brew_install rcm
 brew_install fzf
 brew_install coreutils
-brew_ui_install dbeaver-community
+# 已卸载(2026-11)，需要时取消注释重装
+# brew_ui_install dbeaver-community
 brew_install lazygit
 brew_install wget
-brew_install herdr
 brew_install stow
 brew_install gnupg
 
@@ -145,11 +163,34 @@ brew_install ranger
 ln -sf "${HOME}/dev/mac-install/config/ranger" "${HOME}/.config/ranger"
 
 cd "${SCRIPT_DIR}/.." || exit 0
-
+# 清掉可能存在的手动绝对链接（非 stow 创建会让 stow 拒绝接管）
+for lf_helper in "${SCRIPT_DIR}/../local/.local/bin"/*; do
+  [ -f "$lf_helper" ] || continue
+  helper_name="$(basename "$lf_helper")"
+  helper_link="${HOME}/.local/bin/${helper_name}"
+  if [ -L "$helper_link" ]; then
+    case "$(readlink "$helper_link")" in
+    "${SCRIPT_DIR}/../local/.local/bin/"* | "$PWD/local/.local/bin/"* | */dev/mac-install/local/.local/bin/*)
+      rm -f "$helper_link"
+      ;;
+    esac
+  fi
+done
 stow -t ~ local
 stow -t ~ zsh
 stow -t ~ git
+stow -t ~ herdr
 
+# lf config: keep ~/.config/lf as a symlink straight to the repo directory
+# so every edit is picked up immediately (stow copies files when the target
+# directory is already a symlink, which is why we do not stow this package).
+LF_SRC="${SCRIPT_DIR}/../lf/.config/lf"
+mkdir -p "${HOME}/.config"
+ln -sfn "$LF_SRC" "${HOME}/.config/lf"
+# helper scripts are managed by the `local` stow package (./local/.local/bin)
 cd "$SCRIPT_DIR"
 
 npm install -g --allow-scripts=opencode-ai opencode-ai || true
+
+# === pi agent ===
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent || true

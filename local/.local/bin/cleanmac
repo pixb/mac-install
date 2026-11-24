@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+# ========== 可配置项 ==========
+# 设为 0 可保留 QQ音乐已下载的离线歌曲（iDownloadProxy，约 5.3G）
+QQMUSIC_REMOVE_DOWNLOADS=1
+
+# 若目录存在，清空其中内容（不删除目录本身）
+clean_dir() {
+  local dir="$1"
+  [ -d "$dir" ] || return 0
+  printf '→ 清空 %s\n' "$dir"
+  find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+}
+
 # 清理Homebrew缓存
 brew cleanup -v --prune=all
 
@@ -37,3 +49,51 @@ sudo killall -HUP mDNSResponder
 
 # 清理Spotlight索引
 sudo mdutil -E /
+
+# ========== ~/Library 大目录清理 ==========
+
+# 1. Caches：只清体积最大的几个，保留 go-build 等编译缓存以免拖慢构建
+for cache in \
+  "$HOME/Library/Caches/com.tencent.workbuddy.mac.BundleMigration" \
+  "$HOME/Library/Caches/Doubao" \
+  "$HOME/Library/Caches/cn.trae.app.ShipIt" \
+  "$HOME/Library/Caches/Google" \
+  "$HOME/Library/Caches/Trae CN" \
+  "$HOME/Library/Caches/JetBrains" \
+  "$HOME/Library/Caches/qoder-updater" \
+  "$HOME/Library/Caches/qianfan-desktop-app-updater" \
+  "$HOME/Library/Caches/webcatalog" \
+  "$HOME/Library/Caches/vscode-cpptools" \
+  "$HOME/Library/Caches/com.postmanlabs.mac.ShipIt" \
+  "$HOME/Library/Caches/Steam" \
+  "$HOME/Library/Caches/xyz.chatboxapp.app-updater"; do
+  clean_dir "$cache"
+done
+
+# 2. 豆包：日志、更新包、内置浏览器缓存（约 4.5G）
+clean_dir "$HOME/Library/Application Support/Doubao/sdk_storage/log"
+clean_dir "$HOME/Library/Application Support/Doubao/update"
+clean_dir "$HOME/Library/Application Support/Doubao/gecko_cache"
+clean_dir "$HOME/Library/Application Support/Doubao/hot_fix"
+clean_dir "$HOME/Library/Application Support/Doubao/GraphiteDawnCache"
+clean_dir "$HOME/Library/Application Support/Doubao/ShaderCache"
+clean_dir "$HOME/Library/Application Support/Doubao/GrShaderCache"
+
+# 3. Xcode 编译中间产物（约 1G）
+clean_dir "$HOME/Library/Developer/Xcode/DerivedData"
+
+# 4. QQ音乐（约 8.6G）
+QQMUSIC_BASE="$HOME/Library/Containers/com.tencent.QQMusicMac/Data/Library/Application Support/QQMusicMac"
+if pgrep -f QQMusic >/dev/null 2>&1; then
+  echo '⚠️  QQ音乐正在运行，跳过清理（请先退出 QQ音乐）'
+else
+  clean_dir "$QQMUSIC_BASE/iRRCache"      # 播放缓存
+  clean_dir "$QQMUSIC_BASE/iCache"        # 音质缓存
+  clean_dir "$QQMUSIC_BASE/iLog"
+  clean_dir "$QQMUSIC_BASE/iQmc"          # 在线加密歌曲缓存（mflac/mgg），重播会重新缓存
+  if [ "$QQMUSIC_REMOVE_DOWNLOADS" = '1' ]; then
+    clean_dir "$QQMUSIC_BASE/iDownloadProxy"  # 已下载的离线歌曲，删除后需重新下载
+  fi
+fi
+
+echo '✓ Library 清理完成'

@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# @author nate zhou
+# macOS port of ../dotfiles/.local/bin/scope (general previewer for LF & FZF)
+# Changes from Linux version:
+#   - GNU-only absolute paths (/usr/bin/chafa, /usr/bin/magick, ...) use PATH
+#   - GNU stat/readlink/tail/grep flags replaced with portable equivalents
+#   - Linux-only thumbnailers (gnome-epub-thumbnailer, transmission-show,
+#     iso-info, unrar-free, odt2txt, firejail) get macOS-friendly fallbacks
+#   - $PAGER defaults to `less -R` if unset
+
+: "${PAGER:=less -R}"
+
+# save a cache file for faster preview
+[ -d "$HOME/.cache/lf" ] || mkdir -p "$HOME/.cache/lf"
+
+cell_px(){
+    # lf redirects previewer stdout to the preview file, so query fd 2 /dev/tty.
+    python3 -c '
+import fcntl,termios,struct,os
+def q(fd):
+    return struct.unpack("hhhh", fcntl.ioctl(fd, termios.TIOCGWINSZ, b"\0"*8))
+try:
+    r, c, x, y = q(2)
+except OSError:
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY)
+        r, c, x, y = q(fd)
+        os.close(fd)
+    except OSError:
+        print(12, 28)
+        raise SystemExit
+cw = x / c if c > 0 and x >= 2 * c else x
+ch = y / r if r > 0 and y >= 2 * r else y
+cw = int(cw) if cw >= 4 else 8
+ch = int(ch) if ch >= 6 else 16
+print(min(cw, 40), min(ch, 60))' 2>/dev/null || echo "12 28"
+}
+
+src_dims(){
+    D=$(identify -format '%w %h' -- "$1" 2>/dev/null) || D=""
+    case "$D" in *[!0-9\ ]*|"") D=$(python3 - "$1" 2>/dev/null <<'PY'
+import sys
+try:
+    from PIL import Image
+    im = Image.open(sys.argv[1])
+    print(im.size[0], im.size[1])
+except Exception:
+    pass
+PY
+) ;; esac
+    case "$D" in *[!0-9\ ]*|"") D=$(magick identify -format '%w %h' -- "$1" 2>/dev/null) || D="" ;; esac
+    printf '%s' "$D"
+}
+
+is_dims(){
+    set -- $1
+    [ "$#" -eq 2 ] || return 1
+    case "$1$2" in *[!0-9]*) return 1 ;; esac
+    [ "$1" -gt 0 ] && [ "$2" -gt 0 ]
+}
+
+sixel_cells(){
+    CELLS=$(cell_px); CW=${CELLS% *}; CH=${CELLS#* }
+    DIMS=$(src_dims "$3"); SW=${DIMS% *}; SH=${DIMS#* }
+    S=$(awk -v cols="$1" -v rows="$2" -v cw="$CW" -v ch="$CH" -v sw="$SW" -v sh="$SH" -v maxpx=1000000 '
+        BEGIN{
+            hh = ch / 2;
+            w = cols * cw; h = rows * ch;
+            if (w * h > maxpx) { s = sqrt(maxpx / (w * h)); w = int(w * s); h = int(h * s) }
+            A = int(w / cw); if (A < 1) A = 1
+            B = int(h / ch); if (B < 1) B = 1
+            if (sw + 0 > 0 && A > sw + 0) A = sw + 0
+            if (sh + 0 > 0 && B > sh + 0) B = sh + 0
+            if (sw + 0 > 0 && sh + 0 > 0) {
+                a = A; b = int((a * cw * (sh + 0)) / ((sw + 0) * hh) + 0.5)
+                if (b > B) { b = B; a = int((b * hh * (sw + 0)) / ((sh + 0) * cw) + 0.5) }
+                if (b < 1) b = 1
+            } else { a = A; b = B }
+            if (a < 1) a = 1
+            printf "%dx%d", a, b
+        }')
+    printf '%s' "$S"
+}
+
+# cache key: portable stat (GNU gstat if present, BSD stat otherwise)
+cache_path(){
+    resolved="$1"
+    [ -L "$resolved" ] && resolved=$(readlink "$resolved")
+    key=$(gstat --printf '%s%n%Y' "$resolved" 2>/dev/null \
+          || stat -f '%z%N%m' "$resolved" 2>/dev/null)
+    printf '%s' "$HOME/.cache/lf/$(printf '%s' "$key" | xxh3sum 2>/dev/null | cut -d' ' -f1)"
+}
+
+show_img(){
+    if [ -n "$FZF_LEVEL" ] || [ -n "$NVIM" ] || [ -n "$DVTM" ]; then
+        catimg -t -w 80 "$1" 2>/dev/null || printf 'image %s\n' "$(basename "$1")"
+    elif command -v chafa >/dev/null 2>&1; then
+        chafa -f sixel \
+              -s "$(sixel_cells "$2" "$3" "$1")" \
+              --animate off --polite on -t 1 --bg '#111111' \
+              -c full --dither none "$1" \
+            || catimg -t -w "$(($2 * 2))" "$1" 2>/dev/null \
+            || printf 'image %s\n' "$(basename "$1")"
+    else
+        catimg -t -w "$(($2 * 2))" "$1" 2>/dev/null || printf 'image %s\n' "$(basename "$1")"
+    fi
+}
+
+case "$(file -Lb --mime-type -- "$1")" in
+    image/*xcf|image/heic|image/x-xpixmap)
+        CACHE=$(cache_path "$1")
+        [ -f "${CACHE}.jpg" ] || magick "$1" -flatten -quality 50 "${CACHE}.jpg" 2>/dev/null
+        show_img "${CACHE}.jpg" "$2" "$3"
+        ;;
+    image/*)
+        show_img "$1" "$2" "$3"
+        ;;
+    video/*)
+        CACHE=$(cache_path "$1")
+        [ -f "${CACHE}.jpg" ] || ffmpegthumbnailer -i "$1" -s 480 -q 5 -o "${CACHE}.jpg" 2>/dev/null
+        if [ -f "${CACHE}.jpg" ]; then show_img "${CACHE}.jpg" "$2" "$3"; else file -b "$1"; fi
+        ;;
+    audio/*)
+        if command -v mid3v2 >/dev/null 2>&1; then mid3v2 -l "$1"; else file -b "$1"; fi
+        ;;
+    font/ttf)
+        CACHE=$(cache_path "$1")
+        [ -f "${CACHE}.jpg" ] || magick -background none -fill white "$1" "${CACHE}.jpg" 2>/dev/null
+        show_img "${CACHE}.jpg" "$2" "$3"
+        ;;
+    application/epub+zip)
+        CACHE=$(cache_path "$1")
+        [ -f "${CACHE}.png" ] || {
+            if command -v gnome-epub-thumbnailer >/dev/null 2>&1; then
+                gnome-epub-thumbnailer "$1" "${CACHE}.png"
+            else
+                unzip -p "$1" '*.jpg' '*.jpeg' '*.png' 2>/dev/null | head -c 200000 > /dev/null
+                printf 'epub %s\n' "$(basename "$1")"
+            fi
+        }
+        [ -f "${CACHE}.png" ] && show_img "${CACHE}.png" "$2" "$3" || printf 'epub %s\n' "$(basename "$1")"
+        ;;
+    application/pdf)
+        CACHE=$(cache_path "$1")
+        [ -f "${CACHE}.jpg" ] || pdftoppm -f 1 -l 1 -singlefile -jpeg "$1" "$CACHE" 2>/dev/null
+        [ -f "${CACHE}.jpg" ] && show_img "${CACHE}.jpg" "$2" "$3" || printf 'pdf %s\n' "$(basename "$1")"
+        ;;
+    application/zip|application/vnd.android.package-archive)
+        zipinfo "$1" 2>/dev/null | $PAGER
+        ;;
+    application/gzip)
+        case "$1" in
+            *tar.gz) tar vvtf "$1" 2>/dev/null | $PAGER ;;
+            *)       zless "$1" 2>/dev/null | $PAGER || gzip -cd -- "$1" 2>/dev/null | $PAGER ;;
+        esac
+        ;;
+    application/x-7z-compressed)
+        7z l -ba "$1" 2>/dev/null | awk '{print $NF}' | $PAGER
+        ;;
+    application/*tar|application/*zip*|application/zstd|application/*xz)
+        tar vvtf "$1" 2>/dev/null | $PAGER
+        ;;
+    application/vnd.rar)
+        if command -v unrar-free >/dev/null 2>&1; then
+            unrar-free -t "$1" 2>/dev/null | tail -n +8 | $PAGER
+        elif command -v unar >/dev/null 2>&1; then
+            unar -L "$1" 2>/dev/null | $PAGER
+        else
+            file -b "$1"
+        fi
+        ;;
+    application/x-bittorrent)
+        if command -v transmission-show >/dev/null 2>&1; then transmission-show "$1" | $PAGER; else file -b "$1"; fi
+        ;;
+    application/x-iso*)
+        if command -v iso-info >/dev/null 2>&1; then iso-info --no-header "$1" | tail -n +2 | $PAGER; else file -b "$1"; fi
+        ;;
+    application/*opendocument*)
+        if command -v odt2txt >/dev/null 2>&1; then odt2txt "$1"; else unzip -p "$1" content.xml 2>/dev/null | $PAGER; fi
+        ;;
+    application/octet-stream)
+        file -b "$1"
+        ;;
+    message/rfc822)
+        $PAGER "$1"
+        ;;
+    text/troff)
+        man -l "$1"
+        ;;
+    text/html)
+        case "$1" in
+            *svg) show_img "$1" "$2" "$3" ;;
+            *)    w3m -dump "$1" 2>/dev/null | $PAGER || $PAGER "$1" ;;
+        esac
+        ;;
+    text/*|application/pgp-signature|application/pgp-keys|application/javascript|application/json|application/mbox)
+        case "$1" in
+            *svg) show_img "$1" "$2" "$3" ;;
+            *)    bat "$1" 2>/dev/null || $PAGER "$1" ;;
+        esac
+        ;;
+    inode/directory)
+        du -aLhd1 "$1" 2>/dev/null | sort -rh
+        ;;
+esac

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# seal - GPG helper used by lf bindings (Sr/Sc/Se/Sd/Ss/Sv)
+set -euo pipefail
+usage(){ cat >&2 <<'U'
+usage: seal [--rifle|--cipher|--encrypt|--decrypt|--sign|--verify] FILE
+U
+exit 1; }
+mode="${1:-}"; case "$mode" in --rifle|--cipher|--encrypt|--decrypt|--sign|--verify) shift ;; *) usage ;; esac
+[ "$#" -gt 0 ] || usage
+file="$1"
+case "$mode" in
+    --rifle)
+        # print encrypted contents to stdout (pipe-friendly for rifle)
+        gpg --batch --yes --decrypt "$file"
+        ;;
+    --cipher)
+        gpg --batch --yes --symmetric --cipher-algo AES256 "$file"
+        ;;
+    --encrypt)
+        gpg --batch --yes --encrypt "$file"
+        ;;
+    --decrypt)
+        gpg --batch --yes --decrypt "$file" > "${file%.gpg}" && rm -- "$file"
+        ;;
+    --sign)
+        gpg --batch --yes --detach-sign --armor "$file"
+        ;;
+    --verify)
+        gpg --batch --verify "$file" "${file%.asc}" 2>&1
+        ;;
+esac

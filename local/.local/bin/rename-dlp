@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# clean up youtube-dl style filenames: "Title [ID].ext" -> "Title.ext"
+set -euo pipefail
+for f in "$@"; do
+    d=$(dirname "$f"); b=$(basename "$f")
+    new=$(printf '%s' "$b" | sed -E 's/[[:space:]]*\[[A-Za-z0-9_-]{11}\]//g')
+    [ "$b" = "$new" ] && continue
+    [ -e "$d/$new" ] && { echo "exists: $d/$new" >&2; continue; }
+    mv -- "$f" "$d/$new"
+done

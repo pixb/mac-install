@@ -1,0 +1,76 @@
+{
+  "version": 3,
+  "workspaces": [
+    {
+      "id": "w1",
+      "custom_name": null,
+      "identity_cwd": "/Volumes/data/dev/code/ai/pix-auto-video",
+      "public_pane_numbers": {
+        "1": 1
+      },
+      "next_public_pane_number": 2,
+      "public_tab_numbers": [
+        1
+      ],
+      "next_public_tab_number": 2,
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 1
+          },
+          "panes": {
+            "1": {
+              "cwd": "/Volumes/data/dev/code/ai/pix-auto-video",
+              "agent_session": {
+                "source": "herdr:pi",
+                "agent": "pi",
+                "kind": "path",
+                "value": "/Users/pix/.pi/agent/sessions/--Volumes-data-dev-code-ai-pix-auto-video--/2026-11-22T23-12-14-652Z_01a20588-1738-7543-ad5b-e72166323193.jsonl"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 1,
+          "root_pane": 1
+        }
+      ],
+      "active_tab": 0
+    },
+    {
+      "id": "w2",
+      "custom_name": null,
+      "identity_cwd": "/Volumes/data/dev/code/ai/pix-auto-video",
+      "public_pane_numbers": {
+        "2": 1
+      },
+      "next_public_pane_number": 2,
+      "public_tab_numbers": [
+        1
+      ],
+      "next_public_tab_number": 2,
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/Volumes/data/dev/code/ai/pix-auto-video"
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
+        }
+      ],
+      "active_tab": 0
+    }
+  ],
+  "active": 0,
+  "selected": 0,
+  "sidebar_width": null,
+  "sidebar_section_split": null,
+  "collapsed_space_keys": []
+}

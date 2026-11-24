@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# backup files before destructive lf operations
+#   bk FILE...          copy each FILE to FILE.bak (or numbered)
+#   bk --in-place FILE...  move original aside so the destination is free
+set -euo pipefail
+inplace=0
+[ "${1:-}" = "--in-place" ] && { inplace=1; shift; }
+[ "$#" -gt 0 ] || { echo "usage: bk [--in-place] FILE..." >&2; exit 1; }
+for src in "$@"; do
+    [ -e "$src" ] || continue
+    dst="${src}.bak"; n=1
+    while [ -e "$dst" ]; do dst="${src}.bak.${n}"; n=$((n+1)); done
+    if [ "$inplace" -eq 1 ]; then
+        mv -- "$src" "$dst"
+    else
+        cp -a -- "$src" "$dst"
+    fi
+    printf 'backed up: %s -> %s\n' "$src" "$dst" >&2
+done

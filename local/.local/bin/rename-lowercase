@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+for f in "$@"; do
+    d=$(dirname "$f"); b=$(basename "$f")
+    low=$(printf '%s' "$b" | tr '[:upper:]' '[:lower:]')
+    [ "$b" = "$low" ] && continue
+    [ -e "$d/$low" ] && { echo "exists: $d/$low" >&2; continue; }
+    mv -- "$f" "$d/$low"
+done

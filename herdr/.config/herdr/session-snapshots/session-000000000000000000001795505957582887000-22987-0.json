@@ -1,0 +1,128 @@
+{
+  "version": 3,
+  "workspaces": [
+    {
+      "id": "w1",
+      "custom_name": null,
+      "identity_cwd": "/Volumes/data/dev/code/ai/pix-auto-video",
+      "public_pane_numbers": {
+        "1": 1
+      },
+      "next_public_pane_number": 2,
+      "public_tab_numbers": [
+        1
+      ],
+      "next_public_tab_number": 2,
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 1
+          },
+          "panes": {
+            "1": {
+              "cwd": "/Volumes/data/dev/code/ai/pix-auto-video",
+              "agent_session": {
+                "source": "herdr:pi",
+                "agent": "pi",
+                "kind": "path",
+                "value": "/Users/pix/.pi/agent/sessions/--Volumes-data-dev-code-ai-pix-auto-video--/2026-11-22T23-12-14-652Z_01a20588-1738-7543-ad5b-e72166323193.jsonl"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 1,
+          "root_pane": 1
+        }
+      ],
+      "active_tab": 0
+    },
+    {
+      "id": "w2",
+      "custom_name": null,
+      "identity_cwd": "/Users/pix/Library",
+      "public_pane_numbers": {
+        "2": 1,
+        "4": 2
+      },
+      "next_public_pane_number": 3,
+      "public_tab_numbers": [
+        1,
+        2
+      ],
+      "next_public_tab_number": 3,
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 2
+          },
+          "panes": {
+            "2": {
+              "cwd": "/Users/pix/Library",
+              "agent_session": {
+                "source": "herdr:pi",
+                "agent": "pi",
+                "kind": "path",
+                "value": "/Users/pix/.pi/agent/sessions/--Users-pix-Library--/2026-11-24T07-08-56-652Z_01a20c62-e1cb-71f2-850d-a938f8ac2874.jsonl"
+              }
+            }
+          },
+          "zoomed": false,
+          "focused": 2,
+          "root_pane": 2
+        },
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 4
+          },
+          "panes": {
+            "4": {
+              "cwd": "/Users/pix/Library"
+            }
+          },
+          "zoomed": false,
+          "focused": 4,
+          "root_pane": 4
+        }
+      ],
+      "active_tab": 1
+    },
+    {
+      "id": "w3",
+      "custom_name": null,
+      "identity_cwd": "/Users/pix/Library",
+      "public_pane_numbers": {
+        "3": 1
+      },
+      "next_public_pane_number": 2,
+      "public_tab_numbers": [
+        1
+      ],
+      "next_public_tab_number": 2,
+      "tabs": [
+        {
+          "custom_name": null,
+          "layout": {
+            "Pane": 3
+          },
+          "panes": {
+            "3": {
+              "cwd": "/Users/pix/Library"
+            }
+          },
+          "zoomed": false,
+          "focused": 3,
+          "root_pane": 3
+        }
+      ],
+      "active_tab": 0
+    }
+  ],
+  "active": 1,
+  "selected": 1,
+  "sidebar_width": null,
+  "sidebar_section_split": null,
+  "collapsed_space_keys": []
+}

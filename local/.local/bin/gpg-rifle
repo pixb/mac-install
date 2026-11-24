@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# decrypt a .gpg file and open it with the right macOS viewer
+set -euo pipefail
+f="${1:-}"
+[ -n "$f" ] || exit 1
+pass="$(osascript -e 'display dialog "GPG passphrase:" default answer "" with hidden answer' -e 'text returned of result' 2>/dev/null)" || exit 1
+case "$f" in
+    *.pdf.gpg) gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 -d "$f" <<<"$pass" | open -f -a Preview ;;
+    *)         gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 -d "$f" <<<"$pass" | less -R ;;
+esac

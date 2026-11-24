@@ -1,0 +1,507 @@
+#!/usr/bin/env python3
+"""
+app — macOS 应用安装/卸载与 ~/Library 残留清理的统一入口
+
+用法:
+  app list                          列出 Homebrew 已安装的 cask 及其残留(zap)路径数量
+  app audit [--min-size 1M]         扫描 ~/Library，报告"App 已不在但数据还在"的候选目录(只读)
+  app trash                         扫描废纸篓中的 .app，列出其残留路径(只读)
+  app sweep [-y]                    同上，但真正删除残留
+  app uninstall <名称|cask> [-y]    统一卸载: brew cask 走 --zap; 否则按 zap 映射 + bundle ID 清理
+  app install <cask>                等价于 brew install --cask <cask>
+
+设计要点:
+  Homebrew 的 cask API 缓存(~/Library/Caches/Homebrew/api/cask/*.json)中，
+  每个软件都登记了 zap 路径 —— 这是一份社区维护的 "App → ~/Library 残留" 映射。
+  本工具复用这份映射，无需自己记账；对没有 cask 的 App 退化为 bundle ID / 名称匹配。
+  所有删除都经过 safe_target() 白名单校验，且默认只报告，需 -y 才执行。
+"""
+
+import argparse
+import glob
+import json
+import os
+import plistlib
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+CASK_CACHE = HOME / "Library/Caches/Homebrew/api/cask"
+TRASH = HOME / ".Trash"
+APP_DIRS = [
+    Path("/Applications"),
+    HOME / "Applications",
+    Path("/System/Applications"),
+    Path("/System/Applications/Utilities"),
+]
+LIB_ROOTS = [
+    "Application Support", "Caches", "Containers", "Group Containers",
+    "Preferences", "Logs", "HTTPStorages", "Saved Application State",
+]
+
+# 通用词 / 系统服务 / 开发者工具缓存：audit 时视为"正常存在"，不算孤儿
+GENERIC = {
+    "com", "org", "net", "app", "mac", "group", "systemgroup", "inc", "ltd",
+    "the", "www", "dev", "io", "co", "info", "data", "file", "user", "core",
+}
+SYSTEM_NAMES = {
+    "addressbook", "callhistorydb", "callhistorytransactions", "cloudkit",
+    "clouddocs", "fileprovider", "passkit", "gamekit", "geoservices",
+    "familycircled", "differentialprivacy", "knowledge", "animoji",
+    "audiosession", "sharedfilelist", "byhost", "globalpreferences",
+    "iCloud", "mobile documents", "trial", "suggestions", "statuskit",
+    "identityservices", "personalizationportrait", "mediaanalysis",
+    "passes", "keychains", "accounts", "metadata", "translations",
+}
+TOOL_NAMES = {
+    "go", "go-build", "gopls", "goimports", "node", "node-gyp", "npm",
+    "pnpm", "bun", "yarn", "pip", "pipenv", "uv", "typescript", "ts-node",
+    "staticcheck", "java", "maven", "cargo", "rust", "python", "pyenv",
+    "rbenv", "sdkman", "flutter", "dart", "ms-playwright-go", "playwright",
+    "chromedriver", "geckodriver", "selenium", "sentry", "crashlytics",
+    "sentrycrash", "breakpad", "sparkle", "keystone", "temporaryitems",
+    "vscode-cpptools", "ms-vscode", "llvm", "cmake", "github", "gitlab",
+}
+IGNORE = {s.lower() for s in (SYSTEM_NAMES | TOOL_NAMES)}
+
+COLOR = {
+    "ok": "\033[0;32m", "warn": "\033[0;33m", "err": "\033[0;31m",
+    "info": "\033[0;34m", "dim": "\033[2m", "nc": "\033[0m",
+}
+
+
+def say(kind, msg):
+    print(f"{COLOR.get(kind, '')}{msg}{COLOR['nc']}")
+
+
+# ------------------------------ brew cask 映射 ------------------------------
+
+def all_casks():
+    """读取 brew cask API 缓存，返回 [{token,name,apps,zap}]。"""
+    out = []
+    if not CASK_CACHE.is_dir():
+        return out
+    for f in CASK_CACHE.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except Exception:
+            continue
+        apps, zap = [], []
+        for art in d.get("artifacts", []):
+            for a in art.get("app", []) or []:
+                apps.append(a)
+            for item in art.get("zap", []) or []:
+                for op in ("trash", "delete", "rmdir"):
+                    for p in item.get(op, []) or []:
+                        zap.append(p)
+        out.append({
+            "token": d.get("token", f.stem),
+            "name": d.get("name", []) or [],
+            "apps": apps,
+            "zap": zap,
+        })
+    return out
+
+
+def installed_cask_tokens():
+    try:
+        r = subprocess.run(["brew", "list", "--cask"], capture_output=True, text=True, timeout=30)
+        return set(r.stdout.split())
+    except Exception:
+        return set()
+
+
+def find_cask(query):
+    """按 cask token / App 文件名 / 名称匹配，返回最佳 cask 或 None。"""
+    q = query.lower().rstrip(".app")
+    casks = all_casks()
+    installed = installed_cask_tokens()
+    # 精确匹配优先
+    for c in casks:
+        if q == c["token"].lower():
+            return c
+    for c in casks:
+        for a in c["apps"]:
+            if q == a.lower().rstrip(".app"):
+                return c
+    # 模糊：名称包含
+    for c in casks:
+        names = [c["token"]] + c["name"] + [a.rstrip(".app") for a in c["apps"]]
+        if any(q in n.lower() or n.lower() in q for n in names if n):
+            return c
+    # 已安装 cask 里找
+    for c in casks:
+        if c["token"] in installed and q in c["token"].lower():
+            return c
+    return None
+
+
+def cask_residue(cask):
+    """展开 cask 的 zap 路径，返回存在的 (显示路径, 绝对路径, KB)。"""
+    result = []
+    for raw in cask["zap"]:
+        p = os.path.expanduser(raw)
+        targets = glob.glob(p) if "*" in p else ([p] if os.path.lexists(p) else [])
+        for t in targets:
+            kb = dir_size_kb(t)
+            result.append((raw, t, kb))
+    return dedup(result)
+
+
+# ------------------------------ 通用工具 ------------------------------
+
+def dir_size_kb(path):
+    try:
+        r = subprocess.run(["du", "-sk", path], capture_output=True, text=True, timeout=60)
+        return int(r.stdout.split()[0])
+    except Exception:
+        return 0
+
+
+def human(kb):
+    if kb >= 1024 * 1024:
+        return f"{kb / 1024 / 1024:.2f} GB"
+    if kb >= 1024:
+        return f"{kb / 1024:.1f} MB"
+    return f"{kb} KB"
+
+
+def dedup(items):
+    seen, out = set(), []
+    for item in items:
+        key = item[1]
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
+    return out
+
+
+def safe_target(path):
+    """删除前的白名单校验：只允许 ~/Library/... 或少数已知 dot 目录。"""
+    p = Path(os.path.expanduser(path)).resolve()
+    try:
+        rel = p.relative_to(HOME)
+    except ValueError:
+        return False
+    s = str(rel)
+    if s in (".", "Library"):
+        return False
+    return (s.startswith("Library/") or s in {".vscode", ".config", ".cache"}
+            or s.startswith((".vscode/", ".config/", ".cache/"))) and p != HOME
+
+
+def bundle_id(app_path):
+    ip = Path(app_path) / "Contents/Info.plist"
+    if not ip.exists():
+        return ""
+    try:
+        with open(ip, "rb") as f:
+            return plistlib.load(f).get("CFBundleIdentifier", "") or ""
+    except Exception:
+        return ""
+
+
+def tokens(text, extra_seps=""):
+    parts = re.split(r"[.\s\-_/@]+" + extra_seps, str(text).lower())
+    return {p for p in parts if len(p) > 3 and p not in GENERIC and p not in IGNORE}
+
+
+def name_matches(app_name, bid, dir_name):
+    """判断 Library 目录名是否属于某 App（保守匹配，避免误删）。
+
+    命中规则（按优先级）：
+      1. 目录名 == 完整 bundle id（如 com.valvesoftware.steam.helper）
+      2. 目录名以 bundle id 开头/结尾（如 com.ccswitch.desktop.helper）
+      3. 目录名 == App 名，或 App 名的最后一个有意义词与目录名完全相同
+         （如 audacity / flameshot / kitty），且目录名不是复合词。
+    刻意不做 token 交集：像 "desktop" / "code" 这类通用词会造成大量误报。
+    """
+    dn = dir_name.lower()
+    # 去掉 team id 前缀，如 HUAQ24HBR6.dev.orbstack
+    dn_core = dn
+    m = re.match(r"^[a-z0-9]{10}\.(.+)$", dn)
+    if m:
+        dn_core = m.group(1)
+    dn_core = dn_core[6:] if dn_core.startswith("group.") else dn_core
+
+    if bid:
+        bl = bid.lower()
+        if dn == bl or dn_core == bl:
+            return True
+        if dn.startswith(bl + ".") or dn.endswith("." + bl):
+            return True
+        # bundle 末段作为目录主体，如 org.audacityteam.audacity.plist -> audacity
+        last = bl.split(".")[-1]
+        if len(last) > 3 and dn_core == last:
+            return True
+
+    an = app_name.lower().rstrip(".app")
+    if dn == an or dn_core == an:
+        return True
+    # App 名可能带版本，如 "Audacity 4" -> 用有意义的词精确等于目录名
+    app_words = [w for w in re.split(r"[.\s\-_]+", an) if len(w) > 3 and w not in GENERIC]
+    return len(app_words) == 1 and dn_core == app_words[0]
+
+
+def parse_size(s):
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([KMG])?", s.strip(), re.I)
+    if not m:
+        return 0
+    factor = {"": 1, "K": 1, "M": 1024, "G": 1024 * 1024}[(m.group(2) or "K").upper()]
+    return int(float(m.group(1)) * factor)
+
+
+def do_delete(items, yes):
+    """items: [(display, abspath, kb)]; 返回释放 KB。"""
+    items = [i for i in items if safe_target(i[1])]
+    if not items:
+        say("warn", "没有可安全删除的路径")
+        return 0
+    total = sum(i[2] for i in items)
+    for display, abspath, kb in items:
+        print(f"  {human(kb):>10}  {display}")
+    say("info", f"以上共 {len(items)} 项，约 {human(total)}")
+    if not yes:
+        try:
+            ans = input("确认删除? [y/N] ").strip().lower()
+        except EOFError:
+            ans = ""
+        if ans not in ("y", "yes"):
+            say("warn", "已取消，未删除任何内容")
+            return 0
+    freed = 0
+    for display, abspath, kb in items:
+        p = Path(abspath)
+        try:
+            if p.is_dir() and not p.is_symlink():
+                shutil.rmtree(p)
+            elif os.path.lexists(str(p)):
+                p.unlink()
+            freed += kb
+            say("ok", f"✓ {display}")
+        except FileNotFoundError:
+            say("dim", f"- {display} (已不存在)")
+        except Exception as e:
+            say("err", f"✗ {display}: {e}")
+    say("ok", f"完成，释放约 {human(freed)}")
+    return freed
+
+
+# ------------------------------ 子命令 ------------------------------
+
+def cmd_list(args):
+    installed = installed_cask_tokens()
+    casks = [c for c in all_casks() if c["token"] in installed]
+    casks.sort(key=lambda c: c["token"])
+    if not casks:
+        say("warn", "没有 brew 安装的 cask")
+        return
+    say("info", f"Homebrew 已安装 {len(casks)} 个 cask:")
+    for c in casks:
+        apps = ", ".join(a.rstrip(".app") for a in c["apps"]) or "-"
+        residue = cask_residue(c)
+        print(f"  {c['token']:<28} app={apps:<24} 残留项={len(residue)}")
+
+
+def cmd_audit(args):
+    min_kb = parse_size(args.min_size)
+    # 已安装 App 的 token 集合
+    installed = set()
+    for d in APP_DIRS:
+        if not d.is_dir():
+            continue
+        for entry in d.iterdir():
+            if entry.name.endswith(".app"):
+                installed |= tokens(entry.name[:-4])
+                installed |= tokens(bundle_id(entry))
+    for c in all_casks():
+        if c["token"] in installed_cask_tokens():
+            installed |= tokens(c["token"])
+            for n in c["name"]:
+                installed |= tokens(n)
+            for a in c["apps"]:
+                installed |= tokens(a[:-4])
+
+    rows = []
+    for root in LIB_ROOTS:
+        base = HOME / "Library" / root
+        if not base.is_dir():
+            continue
+        for entry in base.iterdir():
+            name = entry.name
+            low = name.lower()
+            if low.startswith("com.apple") or low.startswith("group.com.apple") or low.startswith("systemgroup.com.apple"):
+                continue
+            t = tokens(name)
+            if not t:
+                continue
+            if t & installed:  # 与已安装 App 匹配 → 认为在用
+                continue
+            kb = dir_size_kb(str(entry))
+            if kb < min_kb:
+                continue
+            rows.append((name, str(entry), kb))
+    rows.sort(key=lambda r: -r[2])
+    if not rows:
+        say("ok", f"未发现大于 {args.min_size} 的残留候选")
+        return
+    say("warn", f"发现 {len(rows)} 个可能的残留目录（只读，未删除）:")
+    for name, path, kb in rows:
+        print(f"  {human(kb):>10}  {path.replace(str(HOME) + '/', '~/')}")
+    say("info", "提示: 这些只是候选，含系统服务/CLI 缓存误报；确认后再用 app uninstall 或手动删除")
+
+
+def trash_apps():
+    if not TRASH.is_dir():
+        return []
+    return [p for p in TRASH.iterdir() if p.name.endswith(".app") and p.is_dir()]
+
+
+def residue_for_app(app_path, cask):
+    """给定 App，汇总其残留: cask zap 路径 + bundle ID 名称匹配。"""
+    items = []
+    if cask:
+        items += cask_residue(cask)
+    bid = bundle_id(app_path)
+    app_name = app_path.name[:-4]
+    for root in LIB_ROOTS:
+        base = HOME / "Library" / root
+        if not base.is_dir():
+            continue
+        for entry in base.iterdir():
+            if name_matches(app_name, bid, entry.name):
+                items.append((f"~/Library/{root}/{entry.name}", str(entry), dir_size_kb(str(entry))))
+    return dedup(items)
+
+
+def cmd_trash(args):
+    apps = trash_apps()
+    if not apps:
+        say("info", "废纸篓中没有 .app")
+        return
+    say("info", f"废纸篓中有 {len(apps)} 个 App，正在匹配残留……")
+    for app in apps:
+        cask = find_cask(app.name)
+        items = residue_for_app(app, cask)
+        bid = bundle_id(app)
+        print(f"\n### {app.name}" + (f"  (cask: {cask['token']})" if cask else ""))
+        if bid:
+            print(f"    bundle id: {bid}")
+        if not items:
+            print("    未发现明显残留")
+            continue
+        for display, abspath, kb in items:
+            print(f"    {human(kb):>10}  {display}")
+
+
+def cmd_sweep(args):
+    apps = trash_apps()
+    if not apps:
+        say("info", "废纸篓中没有 .app")
+        return
+    items = []
+    for app in apps:
+        cask = find_cask(app.name)
+        items += residue_for_app(app, cask)
+    items = dedup(items)
+    say("info", f"废纸篓中 {len(apps)} 个 App，共匹配 {len(items)} 条残留路径")
+    do_delete(items, args.yes)
+
+
+def cmd_uninstall(args):
+    cask = find_cask(args.target)
+    # 情况 1: brew 管理的 cask → 让 brew --zap 处理
+    if cask and cask["token"] in installed_cask_tokens():
+        say("info", f"{cask['token']} 由 Homebrew 管理，调用 brew uninstall --zap")
+        cmd = ["brew", "uninstall", "--zap", cask["token"]]
+        print("  " + " ".join(cmd))
+        if args.yes or input("执行? [y/N] ").strip().lower() in ("y", "yes"):
+            subprocess.run(cmd, check=False)
+        return
+    # 情况 2: 找到 App 本体（Applications 或废纸篓）
+    app_path = None
+    for d in APP_DIRS:
+        if d.is_dir():
+            cand = d / args.target
+            if cand.exists():
+                app_path = cand
+                break
+            for p in d.glob("*.app"):
+                if p.name.lower().rstrip(".app") == args.target.lower().rstrip(".app"):
+                    app_path = p
+                    break
+        if app_path:
+            break
+    if not app_path:
+        for p in trash_apps():
+            if p.name.lower().rstrip(".app") == args.target.lower().rstrip(".app"):
+                app_path = p
+                break
+    if app_path and cask:
+        items = residue_for_app(app_path, cask)
+    elif app_path:
+        bid = bundle_id(app_path)
+        app_name = app_path.name[:-4]
+        items = []
+        for root in LIB_ROOTS:
+            base = HOME / "Library" / root
+            if base.is_dir():
+                for entry in base.iterdir():
+                    if name_matches(app_name, bid, entry.name):
+                        items.append((f"~/Library/{root}/{entry.name}", str(entry), dir_size_kb(str(entry))))
+        items = dedup(items)
+    else:
+        say("warn", f"未找到 App '{args.target}'，也没找到对应 cask；可用 app audit 手动排查")
+        return
+
+    print(f"目标: {app_path}")
+    if app_path.parent == TRASH:
+        say("info", "App 已在废纸篓中，仅清理其残留")
+    else:
+        say("warn", f"App 仍在 {app_path.parent}，请先手动移入废纸篓，再运行 app sweep")
+    do_delete(items, args.yes)
+
+
+def cmd_install(args):
+    subprocess.run(["brew", "install", "--cask", args.cask], check=False)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="app", description="macOS 应用安装/卸载与 ~/Library 残留清理统一入口")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("list", help="列出已安装 cask 及其残留路径数").set_defaults(func=cmd_list)
+
+    p = sub.add_parser("audit", help="扫描 ~/Library 中的孤儿目录(只读)")
+    p.add_argument("--min-size", default="1M", help="最小体积，如 500K / 1M / 2G (默认 1M)")
+    p.set_defaults(func=cmd_audit)
+
+    sub.add_parser("trash", help="列出废纸篓 App 的残留(只读)").set_defaults(func=cmd_trash)
+
+    p = sub.add_parser("sweep", help="删除废纸篓 App 的残留")
+    p.add_argument("-y", "--yes", action="store_true", help="跳过确认直接删除")
+    p.set_defaults(func=cmd_sweep)
+
+    p = sub.add_parser("uninstall", help="统一卸载并清理残留")
+    p.add_argument("target", help="App 名称或 cask token")
+    p.add_argument("-y", "--yes", action="store_true", help="跳过确认")
+    p.set_defaults(func=cmd_uninstall)
+
+    p = sub.add_parser("install", help="brew install --cask 的包装")
+    p.add_argument("cask", help="cask token")
+    p.set_defaults(func=cmd_install)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        sys.exit(130)

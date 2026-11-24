@@ -1,0 +1,11 @@
+2026-11-24T03:21:37.976816Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=15540
+2026-11-24T03:21:37.976858Z  INFO herdr::client: connecting to server path=/Users/pix/.config/herdr/herdr-client.sock
+2026-11-24T03:21:38.170458Z  INFO herdr::client::handshake: endpoint handshake succeeded generation=1 server_version=0.9.5
+2026-11-24T03:22:32.619629Z  INFO herdr::logging: herdr exiting event="app.shutdown" subsystem="client" outcome="completed" pid=15540
+2026-11-24T03:22:37.373617Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=22986
+2026-11-24T03:22:37.373634Z  INFO herdr::client: connecting to server path=/Users/pix/.config/herdr/herdr-client.sock
+2026-11-24T03:22:37.621375Z  INFO herdr::client::handshake: endpoint handshake succeeded generation=1 server_version=0.9.5
+2026-11-24T03:22:48.101118Z  INFO herdr::logging: herdr exiting event="app.shutdown" subsystem="client" outcome="completed" pid=22986
+2026-11-24T03:23:38.381130Z  INFO herdr::logging: herdr starting event="app.startup" subsystem="client" outcome="started" pid=23433
+2026-11-24T03:23:38.381213Z  INFO herdr::client: connecting to server path=/Users/pix/.config/herdr/herdr-client.sock
+2026-11-24T03:23:38.588953Z  INFO herdr::client::handshake: endpoint handshake succeeded generation=1 server_version=0.9.5

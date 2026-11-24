@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# replace spaces with underscores
+set -euo pipefail
+for f in "$@"; do
+    d=$(dirname "$f"); b=$(basename "$f")
+    new=$(printf '%s' "$b" | tr ' ' '_')
+    [ "$b" = "$new" ] && continue
+    [ -e "$d/$new" ] && { echo "exists: $d/$new" >&2; continue; }
+    mv -- "$f" "$d/$new"
+done

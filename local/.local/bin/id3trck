@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# set ID3 track number from leading NN_ in filename: id3trck FILE...
+set -euo pipefail
+for f in "$@"; do
+    base=$(basename "$f")
+    num="${base%%_*}"
+    case "$num" in ''|*[!0-9]*) continue ;; esac
+    mid3v2 -T "$num" "$f" 2>/dev/null || {
+        printf 'mid3v2 missing; install: brew install mutagen\n' >&2; exit 1; }
+done
