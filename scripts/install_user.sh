@@ -194,6 +194,8 @@ stow -t ~ local
 stow -t ~ zsh
 stow -t ~ git
 stow -t ~ vim
+stow -t ~ readline
+stow -t ~ wget
 stow -t ~ herdr
 stow -t ~ mpv yt-dlp
 

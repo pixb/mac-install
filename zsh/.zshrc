@@ -53,11 +53,13 @@ export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=yellow'
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 # Load my custom configurations
-for _cfg in alias git fzf android; do
+for _cfg in alias git fzf android functions; do
   [ -r "$HOME/.config/shell/$_cfg.zsh" ] && source "$HOME/.config/shell/$_cfg.zsh"
 done
 [ -r "$HOME/.config/shell/teleport.sh" ] && source "$HOME/.config/shell/teleport.sh"
 unset _cfg
+export INPUTRC="$HOME/.config/readline/inputrc"
+export WGETRC="$HOME/.config/wget/wgetrc"
 
 #########
 #  fzf  #
@@ -115,6 +117,10 @@ fi
 #  Hugging Face  #
 ##################
 export HF_HOME="/Volumes/data/.cache/huggingface"
+export PUB_CACHE="/Volumes/data/.cache/pub-cache"
+export MODELSCOPE_HOME="/Volumes/data/.cache/modelscope"
+export OLLAMA_MODELS="/Volumes/data/ollama"
+export TRITON_CACHE_DIR="/Volumes/data/.cache/triton"
 
 
 # Load a few important annexes, without Turbo
