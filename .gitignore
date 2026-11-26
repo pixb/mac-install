@@ -1,4 +1,11 @@
 .DS_Store
+__pycache__/
+*.pyc
+
+# herdr 运行态（只保留 config.toml / .plugins.lock）
+herdr/.config/herdr/*.log
+herdr/.config/herdr/session.json
+herdr/.config/herdr/session-snapshots/
 
 # gnupg 运行时文件（不应入库）
 gnupg/.gnupg/trustdb.gpg
