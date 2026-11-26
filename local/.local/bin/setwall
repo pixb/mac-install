@@ -1,16 +1,10 @@
-#!/usr/bin/sh
-# @author nate zhou
-# @since 2023,2024,2025,2026
-# @depends swaybg xwallpaper(xorg)
-# setwall - set wallpaper
+#!/usr/bin/env bash
+set -euo pipefail
 
-[ ! -d "$1" ] && ln -sf "$(realpath $1)" $HOME/.local/share/wallpaper;
+[ "$#" -eq 1 ] || { echo "usage: setwall FILE" >&2; exit 1; }
+[ -e "$1" ] || { echo "no such file: $1" >&2; exit 1; }
 
-if [ "$XDG_SESSION_TYPE" = "tty" ]; then
-    exit 0
-elif [ "$XDG_SESSION_TYPE" = "wayland" ]; then
-    killall swaybg
-    nohup swaybg -i $HOME/.local/share/wallpaper -m fill >/dev/null 2>&1 &
-elif [ -n "$XAUTHORITY" ]; then
-    xwallpaper --zoom ${HOME}/.local/share/wallpaper
-fi
+file="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+mkdir -p "$HOME/.local/share"
+ln -sfn "$file" "$HOME/.local/share/wallpaper"
+/usr/bin/osascript -e "tell application \"System Events\" to set picture of every desktop to (POSIX file \"$file\")"

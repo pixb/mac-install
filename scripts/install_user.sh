@@ -52,6 +52,7 @@ brew_install bat
 brew_install fastfetch
 # 已卸载(2026-11)，需要时取消注释重装
 # brew_ui_install visual-studio-code
+brew_ui_install google-chrome
 brew_install ripgrep
 brew_install the_silver_searcher
 brew_install pyenv
@@ -64,6 +65,8 @@ brew_install catimg
 brew_install imagemagick
 brew_install poppler
 brew_install ffmpegthumbnailer
+brew_ui_install vlc
+brew_ui_install obs
 brew_install xxhash
 brew_install mediainfo
 brew_install mpv
@@ -83,6 +86,8 @@ else
 fi
 brew_install rcm
 brew_install fzf
+brew_ui_install obsidian
+brew_ui_install ollama-app
 brew_install coreutils
 # 已卸载(2026-11)，需要时取消注释重装
 # brew_ui_install dbeaver-community
@@ -150,6 +155,15 @@ else
   ln -sf "${HOME}/dev/vimrc/vimrc" "${HOME}"/.vimrc
 fi
 
+if [ -d "${HOME}/.config/nvim/.git" ]; then
+  echo -e "${COLOR_GREEN}pixvim is installed${COLOR_NC}"
+elif [ -e "${HOME}/.config/nvim" ]; then
+  echo -e "${COLOR_YELLOW}${HOME}/.config/nvim exists but is not a git repo, skip clone${COLOR_NC}"
+else
+  mkdir -p "${HOME}/.config"
+  git clone git@github.com:pixb/pixvim.git "${HOME}/.config/nvim"
+fi
+
 brew_install rustup
 # Homebrew 版 rustup 无 rustup-init / init 子命令，用 toolchain install 替代
 if rustup toolchain list 2>/dev/null | grep -q stable; then
@@ -179,7 +193,9 @@ done
 stow -t ~ local
 stow -t ~ zsh
 stow -t ~ git
+stow -t ~ vim
 stow -t ~ herdr
+stow -t ~ mpv yt-dlp
 
 # lf config: keep ~/.config/lf as a symlink straight to the repo directory
 # so every edit is picked up immediately (stow copies files when the target

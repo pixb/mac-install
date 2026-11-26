@@ -40,7 +40,7 @@ source "$HOME/.sdkman/bin/sdkman-init.sh"
 ###################
 #  my 10k config  #
 ###################
-source ~/.pl10krc
+source "$HOME/.config/shell/pl10krc"
 
 #########################
 #  zsh-autosuggestions  #
@@ -53,10 +53,11 @@ export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=yellow'
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 # Load my custom configurations
-source $HOME/dev/linux-demo/config/alias.zsh
-source $HOME/dev/linux-demo/config/git.zsh
-source $HOME/dev/linux-demo/config/fzf.zsh
-source $HOME/dev/linux-demo/config/android.zsh
+for _cfg in alias git fzf android; do
+  [ -r "$HOME/.config/shell/$_cfg.zsh" ] && source "$HOME/.config/shell/$_cfg.zsh"
+done
+[ -r "$HOME/.config/shell/teleport.sh" ] && source "$HOME/.config/shell/teleport.sh"
+unset _cfg
 
 #########
 #  fzf  #
@@ -73,8 +74,8 @@ alias rsync="/opt/homebrew/bin/rsync"
 ###########
 export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/curl/bin:$PATH"
-export PATH=$HOME/dev/linux-demo/pix-shell:$PATH
-export PATH=$HOME/dev/linux-demo/bin:$PATH
+[ -d "$HOME/dev/linux-demo/pix-shell" ] && export PATH="$HOME/dev/linux-demo/pix-shell:$PATH"
+[ -d "$HOME/dev/linux-demo/bin" ] && export PATH="$HOME/dev/linux-demo/bin:$PATH"
 export PATH=$HOME/dev/mac-install/tool/rar:$PATH
 export PATH="/opt/homebrew/opt/mysql-client/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"

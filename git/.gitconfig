@@ -6,14 +6,16 @@
 	whitespace = fix, -indent-with-non-tab, trailing-space, cr-at-eol
 	excludesfile=~/.gitignore_global
 	autocrlf = input
+[init]
+	defaultBranch = main
 [alias]
-    rm="rebase master"
+    rm="rebase main"
     dc="diff --cached"
-    dm="diff master"
+    dm="diff main"
     s="status -s"
     cm="commit -m"
     po="push origin"
-    pom="push origin master"
+    pom="push origin main"
     rebase2="rebase -i HEAD~~"
     lg = log --graph --all --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(bold white)— %an%C(reset)%C(bold yellow)%d%C(reset)' --abbrev-commit --date=relative
     co="clone"
@@ -48,13 +50,12 @@
 # [includeIf "gitdir:~/dev/linux-demo/git/"]
 # 	path = ~/dev/linux-demo/git/.gitconfig
 [commit]
-	template = ~/dev/linux-demo/git/.gitmessage
+	template = ~/.gitmessage
 	
-[safe]
-	directory = /work/docker/docker-prometheus
 [http]
 	postBuffer = 524288000
 [safe]
+	directory = /work/docker/docker-prometheus
 	directory = *
 [filter "lfs"]
 	smudge = git-lfs smudge -- %f

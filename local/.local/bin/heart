@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+roots=(
+  "$HOME/dev/mac-install"
+  "$HOME/.config/nvim"
+  "$HOME/dev/vimrc"
+  "$HOME/dev/linux-demo"
+)
+
+selection=$(
+  for root in "${roots[@]}"; do
+    [ -d "$root" ] || continue
+    git -C "$root" ls-files 2>/dev/null | sed "s|^|$root/|"
+  done | fzf --height 50% --layout=reverse-list --prompt='dotfiles> ' || true
+)
+
+[ -n "$selection" ] || exit 0
+"${EDITOR:-vim}" "$selection"

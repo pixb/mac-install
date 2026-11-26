@@ -1,0 +1,16 @@
+# vim:ft=conf
+# yt-dlp/config
+# @author nate zhou
+# @since 2025,2026
+
+--config-locations ~/.config/yt-dlp/proxy.conf
+
+--embed-metadata
+
+--format 'bv*+ba[format_note*=original]/bv+ba'
+
+--paths ~/Downloads/
+
+--output "%(title).200B.%(ext)s"
+
+--concurrent-fragments 3
