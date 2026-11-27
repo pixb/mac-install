@@ -41,6 +41,7 @@ source "$HOME/.sdkman/bin/sdkman-init.sh"
 #  my 10k config  #
 ###################
 source "$HOME/.config/shell/pl10krc"
+# source "$HOME/.config/shell/pl10krc2"
 
 #########################
 #  zsh-autosuggestions  #
